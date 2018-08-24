@@ -4,7 +4,7 @@
 export MMWAVE_SDK_DEVICE ?= awr16xx
 export DOWNLOAD_FROM_CCS = yes
 
-export MMWAVE_SDK_TOOLS_INSTALL_PATH=/home/anirudh/ti
+export MMWAVE_SDK_TOOLS_INSTALL_PATH=/home/bp8839/ti
  
 # Common settings for awr14xx, awr16xx, iwr14xx, iwr16xx
 # Path to <mmwave_sdk installation path>/packages folder

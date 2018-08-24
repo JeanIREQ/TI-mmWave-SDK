@@ -90,7 +90,10 @@ typedef struct MmwDemo_output_message_header_t
     uint16_t    magicWord[4];
 
     /*! brief   Version: : MajorNum * 2^24 + MinorNum * 2^16 + BugfixNum * 2^8 + BuildNum   */
-    uint32_t     version;
+    uint32_t    version;
+
+    /*! @brief   Tag ID of the radar to differentiate them */
+    uint32_t    tagId;
 
     /*! @brief   Total packet length including header in Bytes */
     uint32_t    totalPacketLen;
