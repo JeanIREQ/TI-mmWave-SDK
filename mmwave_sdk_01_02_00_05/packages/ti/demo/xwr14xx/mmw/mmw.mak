@@ -30,7 +30,8 @@ MMW_DEMO_STD_LIBS = $(R4F_COMMON_STD_LIB)									\
 		   			-llibgpio_$(MMWAVE_SDK_DEVICE_TYPE).$(R4F_LIB_EXT)         	\
 		   			-llibedma_$(MMWAVE_SDK_DEVICE_TYPE).$(R4F_LIB_EXT)			\
 		   			-llibcli_$(MMWAVE_SDK_DEVICE_TYPE).$(R4F_LIB_EXT)			\
-		   			-llibhwa_$(MMWAVE_SDK_DEVICE_TYPE).$(R4F_LIB_EXT)           \
+		   			-llibcan_$(MMWAVE_SDK_DEVICE_TYPE).$(R4F_LIB_EXT)           \
+                    -llibhwa_$(MMWAVE_SDK_DEVICE_TYPE).$(R4F_LIB_EXT)           \
            			-llibcbuff_$(MMWAVE_SDK_DEVICE_TYPE).$(R4F_LIB_EXT)		\
         			-llibhsiheader_$(MMWAVE_SDK_DEVICE_TYPE).$(R4F_LIB_EXT)
 
@@ -46,6 +47,7 @@ MMW_DEMO_LOC_LIBS = $(R4F_COMMON_LOC_LIB)									\
 		   			-i$(MMWAVE_SDK_INSTALL_PATH)/ti/drivers/hwa/lib         \
 		   			-i$(MMWAVE_SDK_INSTALL_PATH)/ti/control/mmwavelink/lib	\
 		   			-i$(MMWAVE_SDK_INSTALL_PATH)/ti/utils/cli/lib			\
+		   			-i$(MMWAVE_SDK_INSTALL_PATH)/ti/drivers/can/lib			\
 		   			-i$(MMWAVE_SDK_INSTALL_PATH)/ti/control/mmwave/lib      \
           	        -i$(MMWAVE_SDK_INSTALL_PATH)/ti/drivers/cbuff/lib		\
         	        -i$(MMWAVE_SDK_INSTALL_PATH)/ti/utils/hsiheader/lib

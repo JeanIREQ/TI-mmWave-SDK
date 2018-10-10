@@ -477,6 +477,61 @@ static int32_t MmwDemo_CLISensorStop (int32_t argc, char* argv[])
     return 0;
 }
 
+#if 0
+
+#define MESSAGESIZE 100
+static int writePosition = 0;
+static int readPosition = 0;
+static char messagesErreur[MESSAGESIZE][80];
+
+void myStrCpy(char *dest, char *src)
+{
+    int i = 0;
+    memset((void*)dest, 0, 80);
+    while(src[i] != 0)
+    {
+        dest[i] = src[i];
+        i++;
+    }
+}
+
+static void initMessagesErreur()
+{
+    static int init = 0;
+    if(init == 0)
+    {
+        int i;
+        for(i=0; i < MESSAGESIZE; i++)
+            myStrCpy(messagesErreur[i], "");
+        init = 1;
+    }
+}
+
+void addDebugToCLI(char *message)
+{
+    initMessagesErreur();
+    myStrCpy(messagesErreur[writePosition], message);
+    writePosition++;
+    if(writePosition >= MESSAGESIZE)
+        writePosition = 0;
+}
+
+static int32_t MmwDemo_CLIGetPrintInfo (int32_t argc, char* argv[])
+{
+    initMessagesErreur();
+    while(readPosition != writePosition)
+    {
+        CLI_write(messagesErreur[readPosition]);
+        readPosition ++;
+        if(readPosition >= MESSAGESIZE)
+            readPosition = 0;
+    }
+
+    return 0;
+}
+
+#endif
+
 /**
  *  @b Description
  *  @n
@@ -858,7 +913,19 @@ void MmwDemo_CLIInit (void)
     cliCfg.tableEntry[cnt].helpString     = NULL;
 #endif
     cliCfg.tableEntry[cnt].cmdHandlerFxn  = MmwDemo_CLIAnalogMonitorCfg;
-    
+    cnt++;
+
+#if 0
+    cliCfg.tableEntry[cnt].cmd            = "getPrintMessage";
+#if 0
+    cliCfg.tableEntry[cnt].helpString     = "No arguments";
+#else
+    cliCfg.tableEntry[cnt].helpString     = NULL;
+#endif
+    cliCfg.tableEntry[cnt].cmdHandlerFxn  = MmwDemo_CLIGetPrintInfo;
+    cnt++;
+#endif
+
     /* Open the CLI: */
     if (CLI_open (&cliCfg) < 0)
     {
