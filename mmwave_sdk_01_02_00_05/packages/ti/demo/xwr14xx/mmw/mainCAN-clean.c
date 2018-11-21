@@ -753,22 +753,22 @@ MmwDemo_MCB    gMmwMCB;
 /** \brief DCAN TX message object used */
 #define DCAN_TX_MSG_OBJ                 (0x1U)
 /** \brief DCAN RX message object used */
-#define DCAN_RX_MSG_OBJ                 (0x2U)
+#define DCAN_RX_MSG_OBJ                 (0x7U)
 
-volatile uint32_t       gTxDoneFlag = 0, gRxDoneFlag = 0, gParityErrFlag = 0;
-uint32_t                iterationCount = 0U;
-volatile uint32_t       gTxPkts = 0, gRxPkts = 0, gErrStatusInt = 0;
-CAN_DCANCfgParams       appDcanCfgParams;
-CAN_DCANMsgObjCfgParams appDcanTxCfgParams;
-CAN_DCANMsgObjCfgParams appDcanRxCfgParams;
-CAN_DCANBitTimeParams   appDcanBitTimeParams;
-CAN_MsgObjHandle        txMsgObjHandle;
-CAN_DCANData            appDcanTxData;
-CAN_DCANData            appDcanRxData;
-uint32_t                dataLength = 0U;
-uint32_t                msgLstErrCnt = 0U;
-uint32_t                dataMissMatchErrCnt = 0U;
-CAN_Handle canHandle;
+volatile uint32_t           gTxDoneFlag = 0, gRxDoneFlag = 0, gParityErrFlag = 0;
+volatile uint32_t           iterationCount = 0U;
+volatile uint32_t           gTxPkts = 0, gRxPkts = 0, gErrStatusInt = 0;
+CAN_DCANCfgParams           appDcanCfgParams;
+CAN_DCANMsgObjCfgParams     appDcanTxCfgParams;
+CAN_DCANMsgObjCfgParams     appDcanRxCfgParams;
+CAN_DCANBitTimeParams       appDcanBitTimeParams;
+volatile CAN_MsgObjHandle   txMsgObjHandle;  // MUST BE DECLARE VOLATILE to avoid compiler optimisation. 
+CAN_DCANData                appDcanTxData;
+CAN_DCANData                appDcanRxData;
+uint32_t                    dataLength = 0U;
+uint32_t                    msgLstErrCnt = 0U;
+uint32_t                    dataMissMatchErrCnt = 0U;
+CAN_Handle                  canHandle;
 
 /**************************************************************************
 ***************CAN Tx Complete and Rx Interrupt Callback ******************
@@ -844,9 +844,11 @@ static void DCANAppInitParams(CAN_DCANCfgParams*        dcanCfgParams,
     dcanCfgParams->parityEnable         = 0;
     dcanCfgParams->intrLine0Enable      = 1;
     dcanCfgParams->intrLine1Enable      = 1;
-    dcanCfgParams->testModeEnable       = 0;
     dcanCfgParams->eccModeEnable        = 0;
-    dcanCfgParams->stsChangeIntrEnable  = 0;
+    dcanCfgParams->testModeEnable       = 0;
+    dcanCfgParams->testMode             = CAN_DCANTestMode_EXT_LPBACK;
+    dcanCfgParams->stsChangeIntrEnable  = 1;
+
     dcanCfgParams->autoRetransmitDisable= 1;
     dcanCfgParams->autoBusOnEnable      = 0;
     dcanCfgParams->errIntrEnable        = 1;
@@ -875,14 +877,16 @@ static void DCANAppInitParams(CAN_DCANCfgParams*        dcanCfgParams,
     dcanTxCfgParams->appCallBack    = DCANAppCallback;
 
     /*Intialize DCAN Rx Config Params*/
-    dcanRxCfgParams->xIdFlagMask        = 0x1;
-    dcanRxCfgParams->msgIdentifierMask  = 0x1FFFFFFF;
-    dcanRxCfgParams->dirMask            = 0x1;
+    dcanRxCfgParams->xIdFlagMask         = 0x1;
+    //dcanRxCfgParams->msgIdentifierMask = 0x1FFFFFFF;
+    dcanRxCfgParams->msgIdentifierMask   = 0x0;
+    dcanRxCfgParams->dirMask             = 0x1;
 
     dcanRxCfgParams->msgValid       = 1;
     dcanRxCfgParams->xIdFlag        = CAN_DCANXidType_11_BIT;
     dcanRxCfgParams->direction      = CAN_Direction_RX;
-    dcanRxCfgParams->msgIdentifier  = 0xC1;
+    //dcanRxCfgParams->msgIdentifier = 0xC1;
+    dcanRxCfgParams->msgIdentifier = 0x99;
 
     dcanRxCfgParams->uMaskUsed      = 1;
     dcanRxCfgParams->intEnable      = 1;
@@ -893,14 +897,14 @@ static void DCANAppInitParams(CAN_DCANCfgParams*        dcanCfgParams,
 
     /*Intialize DCAN Tx transfer Params*/
     dcanTxData->dataLength  = DCAN_MAX_MSG_LENGTH;
-    dcanTxData->msgData[0]  = 0xA5;
-    dcanTxData->msgData[1]  = 0x5A;
-    dcanTxData->msgData[2]  = 0xFF;
-    dcanTxData->msgData[3]  = 0xFF;
-    dcanTxData->msgData[4]  = 0xC3;
-    dcanTxData->msgData[5]  = 0x3C;
-    dcanTxData->msgData[6]  = 0xB4;
-    dcanTxData->msgData[7]  = 0x4B;
+    dcanTxData->msgData[0]  = 0xDE;
+    dcanTxData->msgData[1]  = 0xAD;
+    dcanTxData->msgData[2]  = 0xBE;
+    dcanTxData->msgData[3]  = 0xEF;
+    dcanTxData->msgData[4]  = 0xBA;
+    dcanTxData->msgData[5]  = 0xBE;
+    dcanTxData->msgData[6]  = 0xDE;
+    dcanTxData->msgData[7]  = 0xAD;
 }
 
 /**************************************************************************
@@ -1005,7 +1009,7 @@ void Can_init(void){
     }
 #endif
 
-    /*The pinmux setting for the xWR1443*/
+    /* The pinmux setting for the xWR1443 */
     /* Setup the PINMUX to bring out the XWR14xx CAN pins */
     Pinmux_Set_OverrideCtrl(SOC_XWR14XX_PINP5_PADAE, PINMUX_OUTEN_RETAIN_HW_CTRL, PINMUX_INPEN_RETAIN_HW_CTRL);
     Pinmux_Set_FuncSel(SOC_XWR14XX_PINP5_PADAE, SOC_XWR14XX_PINP5_PADAE_CAN_TX);
@@ -1016,7 +1020,8 @@ void Can_init(void){
     Pinmux_Set_FuncSel(SOC_XWR14XX_PINN4_PADAB, SOC_XWR14XX_PINN4_PADAB_GPIO_0);
 
     /* Configure the divide value for DCAN source clock */
-    SOC_setPeripheralClock(gMmwMCB.socHandle, SOC_MODULE_DCAN, SOC_CLKSOURCE_VCLK, 9U, &errCode);
+    SOC_setPeripheralClock(gMmwMCB.socHandle, SOC_MODULE_DCAN, SOC_CLKSOURCE_VCLK, 4U, &errCode);
+//    SOC_setPeripheralClock(gMmwMCB.socHandle, SOC_MODULE_DCAN, SOC_CLKSOURCE_VCLK, 9U, &errCode);
 
     /* Initialize peripheral memory */
     SOC_initPeripheralRam(gMmwMCB.socHandle, SOC_MODULE_DCAN, &errCode);
@@ -1047,16 +1052,9 @@ void Can_init(void){
     }
 
     /* Configure the CAN driver */
-    retVal = CAN_configBitTime(canHandle, & appDcanBitTimeParams, &errCode);
+    retVal = CAN_configBitTime(canHandle, &appDcanBitTimeParams, &errCode);
     if (retVal < 0){
         System_printf("Error: CAN Module configure bit time failed [Error code %d]\n", errCode);
-        return ;
-    }
-
-    /* Setup the transmit message object */
-    txMsgObjHandle = CAN_createMsgObject(canHandle, DCAN_TX_MSG_OBJ, &appDcanTxCfgParams, &errCode);
-    if (txMsgObjHandle == NULL){
-        System_printf("Error: CAN create Tx message object failed [Error code %d]\n", errCode);
         return ;
     }
 
@@ -1064,6 +1062,13 @@ void Can_init(void){
     rxMsgObjHandle = CAN_createMsgObject (canHandle, DCAN_RX_MSG_OBJ, &appDcanRxCfgParams, &errCode);
     if (rxMsgObjHandle == NULL){
         System_printf("Error: CAN create Rx message object failed [Error code %d]\n", errCode);
+        return ;
+    }
+
+    /* Setup the transmit message object */
+    txMsgObjHandle = CAN_createMsgObject(canHandle, DCAN_TX_MSG_OBJ, &appDcanTxCfgParams, &errCode);
+    if (txMsgObjHandle == NULL){
+        System_printf("Error: CAN create Tx message object failed [Error code %d]\n", errCode);
         return ;
     }
 }
@@ -1802,6 +1807,13 @@ void MmwDemo_transmitProcessedOutput(UART_Handle uartHandle,
                         (MMWAVE_SDK_VERSION_BUGFIX << 8) |
                         (MMWAVE_SDK_VERSION_MINOR << 16) |
                         (MMWAVE_SDK_VERSION_MAJOR << 24);
+
+#ifndef RADAR_TAG_ID_FROM_MAKEFILE
+#error "Please specify radar tag ID with -DRADAR_TAG_ID_FROM_MAKEFILE=xx"
+#endif
+
+    /* If more than one tracker is used */
+    header.tagId = RADAR_TAG_ID_FROM_MAKEFILE; 
 
     packetLen = sizeof(MmwDemo_output_message_header);
     if (pGuiMonSel->detectedObjects && (obj->numObjOut > 0))
@@ -2550,16 +2562,15 @@ void MmwDemo_initTask(UArg arg0, UArg arg1)
     Mailbox_init(MAILBOX_TYPE_MSS);
 
     /* Initialize the GPIO */
-    GPIO_init ();
-
-    /* Initialize the Data Path: */
-    MmwDemo_dataPathInit(&gMmwMCB.dataPathObj);
-
+    GPIO_init();
     /*****************************************************************************
      * Open & configure the drivers:
      *****************************************************************************/
     GPIO_setConfig(SOC_XWR14XX_GPIO_0, GPIO_CFG_OUTPUT);
-    GPIO_write(SOC_XWR14XX_GPIO_0,1);
+    GPIO_write(SOC_XWR14XX_GPIO_0,0);
+
+    /* Initialize the Data Path: */
+    MmwDemo_dataPathInit(&gMmwMCB.dataPathObj);
 
     /* Setup the PINMUX to bring out the UART-1 */
     Pinmux_Set_OverrideCtrl(SOC_XWR14XX_PINN6_PADBE, PINMUX_OUTEN_RETAIN_HW_CTRL, PINMUX_INPEN_RETAIN_HW_CTRL);
