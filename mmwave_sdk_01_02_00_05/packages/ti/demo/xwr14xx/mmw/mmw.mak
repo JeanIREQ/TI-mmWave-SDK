@@ -63,17 +63,18 @@ MMW_DEMO_MAP       = $(MMWAVE_SDK_DEVICE_TYPE)_mmw_demo_mss.map
 MMW_DEMO_OUT       = $(MMWAVE_SDK_DEVICE_TYPE)_mmw_demo_mss.$(R4F_EXE_EXT)
 MMW_DEMO_BIN       = $(MMWAVE_SDK_DEVICE_TYPE)_mmw_demo_mss.bin
 MMW_DEMO_CMD   	   = mss_mmw_linker.cmd
-MMW_DEMO_SOURCES   = main.c 				\
+MMW_DEMO_SOURCES   = main.c                 \
                      sensor_mgmt.c          \
                      data_path.c            \
-                     mmw_cli.c				\
-                     config_hwa_util.c 		\
-                     config_edma_util.c 	\
+                     mmw_cli.c              \
+                     config_hwa_util.c      \
+                     config_edma_util.c     \
                      post_processing.c      \
                      rx_ch_bias_measure.c   \
-		             mmwDemo_monitor.c      \
-                     mmw_lvds_stream.c
-                     
+                     mmwDemo_monitor.c      \
+                     mmw_lvds_stream.c      \
+                     mmWaveFilter.c
+
 MMW_DEMO_DEPENDS   = $(addprefix $(PLATFORM_OBJDIR)/, $(MMW_DEMO_SOURCES:.c=.$(R4F_DEP_EXT)))
 MMW_DEMO_OBJECTS   = $(addprefix $(PLATFORM_OBJDIR)/, $(MMW_DEMO_SOURCES:.c=.$(R4F_OBJ_EXT)))
 

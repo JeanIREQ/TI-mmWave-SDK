@@ -699,6 +699,7 @@
 /* include can */
 #include <ti/drivers/can/can.h>
 #include <ti/drivers/pinmux/pinmux.h>
+#include "mmWaveFilter.h"
 
 /* These address offsets are in bytes, when configure address offset in hardware,
    these values will be converted to number of 128bits */
@@ -867,7 +868,7 @@ static void DCANAppInitParams(CAN_DCANCfgParams*        dcanCfgParams,
     dcanTxCfgParams->msgValid       = 1;
     dcanTxCfgParams->xIdFlag        = CAN_DCANXidType_11_BIT;
     dcanTxCfgParams->direction      = CAN_Direction_TX;
-    dcanTxCfgParams->msgIdentifier  = 0xC1;
+    dcanTxCfgParams->msgIdentifier  = 20 + RADAR_TAG_ID_FROM_MAKEFILE; /* 0xC1; */
 
     dcanTxCfgParams->uMaskUsed  = 1;
     dcanTxCfgParams->intEnable  = 1;
@@ -973,10 +974,28 @@ int32_t DCANAppCalcBitTimeParams(uint32_t               clkFreq,
     return 0;
 }
 
-int TransmitMessageOverCAN()
+int TransmitMessageOverCAN(MmwDemo_DataPathObj *dataPathObj)
 {
     int32_t retVal = 0;
     int32_t errCode = 0;
+
+    mmPoints pointsOutput[100]; 
+    unsigned int nbPointsOutput = 0;
+    unsigned int i;
+    combineNeighborsDataPathObj(dataPathObj, &nbPointsOutput, pointsOutput);
+
+    if(nbPointsOutput == 0) /* nothing to transmit */
+        return 0;
+
+    appDcanTxData.dataLength = DCAN_MAX_MSG_LENGTH; /* This is the beginning of a frame */
+    appDcanTxData.msgData[0] = 0x01;
+    appDcanTxData.msgData[1] = 0x02;
+    appDcanTxData.msgData[2] = 0x03;
+    appDcanTxData.msgData[3] = 0x04;
+    appDcanTxData.msgData[4] = 0x05;
+    appDcanTxData.msgData[5] = 0x06;
+    appDcanTxData.msgData[6] = 0x07;
+    appDcanTxData.msgData[7] = 0x08;
 
     /* Send data over Tx message object */
     retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
@@ -985,6 +1004,31 @@ int TransmitMessageOverCAN()
         System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode);
         return -1;
     }
+
+    for(i = 0; i < nbPointsOutput; i++)
+    {
+        short x = (short)(pointsOutput[i].x * 512);
+        short y = (short)(pointsOutput[i].y * 512);
+        short z = (short)(pointsOutput[i].z * 512);
+        unsigned short intensity = (unsigned short)(pointsOutput[i].intensity * 512);
+
+        appDcanTxData.msgData[0] = (uint8_t)(x & 0xFFU);
+        appDcanTxData.msgData[1] = (uint8_t)((x & 0xFF00U) >> 8U);
+        appDcanTxData.msgData[2] = (uint8_t)(y & 0xFFU);
+        appDcanTxData.msgData[3] = (uint8_t)((y & 0xFF00U) >> 8U);
+        appDcanTxData.msgData[4] = (uint8_t)(z & 0xFFU);
+        appDcanTxData.msgData[5] = (uint8_t)((z & 0xFF00U) >> 8U);
+        appDcanTxData.msgData[6] = (uint8_t)(intensity & 0xFFU);
+        appDcanTxData.msgData[7] = (uint8_t)((intensity & 0xFF00U) >> 8U);
+
+        retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
+        if (retVal < 0)
+        {
+            System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode);
+            return -1;
+        }
+    }
+
     return 0;
 }
 
@@ -2474,7 +2518,7 @@ void MmwDemo_dataPathTask(UArg arg0, UArg arg1)
             MmwDemo_transferLVDSUserData(dataPathObj);
         }
 
-TransmitMessageOverCAN();
+        TransmitMessageOverCAN(dataPathObj);
 
         MmwDemo_transmitProcessedOutput(gMmwMCB.loggingUartHandle,
                                         dataPathObj);
@@ -2714,7 +2758,7 @@ void MmwDemo_initTask(UArg arg0, UArg arg1)
      *****************************************************************************/
     Task_Params_init(&taskParams);
     taskParams.priority  = 4;
-    taskParams.stackSize = 3*1024;
+    taskParams.stackSize = 6*1024;
     Task_create(MmwDemo_dataPathTask, &taskParams, NULL);
 
     return;
