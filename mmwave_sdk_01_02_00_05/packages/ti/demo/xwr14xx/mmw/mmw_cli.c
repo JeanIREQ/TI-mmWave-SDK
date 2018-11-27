@@ -933,6 +933,7 @@ void MmwDemo_CLIInit (void)
         MmwDemo_debugAssert (0);
         return;
     }
+    
     return;
 }
 

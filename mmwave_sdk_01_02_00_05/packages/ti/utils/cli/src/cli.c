@@ -65,7 +65,34 @@
 /**
  * @brief   Global variable which tracks the CLI MCB
  */
-CLI_MCB     gCLI;
+CLI_MCB gCLI;
+
+char *manual_cmd[23] = {
+        "sensorStop\n",
+        "flushCfg\n",
+        "dfeDataOutputMode 1\n",
+        "channelCfg 15 5 0\n",
+        "adcCfg 2 1\n",
+        "adcbufCfg 0 1 0 1\n",
+        "profileCfg 0 77 39 7 57.14 0 0 70 1 240 4884 0 0 30\n",
+        "chirpCfg 0 0 0 0 0 0 0 1\n",
+        "chirpCfg 1 1 0 0 0 0 0 4\n",
+        "frameCfg 0 1 16 0 33.333 1 0\n",
+        "guiMonitor 1 0 0 0 0 0\n",
+        "cfarCfg 0 2 8 4 3 0 768\n",
+        "peakGrouping 1 0 1 1 229\n",
+        "multiObjBeamForming 1 0.5\n",
+        "clutterRemoval 0\n",
+        "calibDcRangeSig 0 -5 8 256\n",
+        "compRangeBiasAndRxChanPhase 0.0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0\n",
+        "measureRangeBiasAndRxChanPhase 0 1.5 0.2\n",
+        "CQRxSatMonitor 0 3 5 123 0\n",
+        "CQSigImgMonitor 0 119 4\n",
+        "analogMonitor 1 1\n",
+        "sensorStart\n",
+        "\n"};
+int nbManualCmd = 23;
+int cntManualCmd = 0;
 
 /**************************************************************************
  **************************** CLI Functions *******************************
@@ -137,6 +164,8 @@ static void CLI_task(UArg arg0, UArg arg1)
         CLI_write (gCLI.cfg.cliBanner);
     }
 
+    Task_sleep(4000); /* need to wait for BIOS_start() */
+
     /* Loop around forever: */
     while (1)
     {
@@ -147,7 +176,14 @@ static void CLI_task(UArg arg0, UArg arg1)
         memset ((void *)&cmdString[0], 0, sizeof(cmdString));
 
         /* Read the command message from the UART: */
-        UART_read (gCLI.cfg.cliUartHandle, &cmdString[0], (sizeof(cmdString) - 1));
+        if(nbManualCmd > cntManualCmd)
+        {
+            strcpy((char*)&cmdString[0], manual_cmd[cntManualCmd]);
+            CLI_write (manual_cmd[cntManualCmd]);
+            cntManualCmd++;
+        }
+        else
+            UART_read (gCLI.cfg.cliUartHandle, &cmdString[0], (sizeof(cmdString) - 1));
 
         /* Reset all the tokenized arguments: */
         memset ((void *)&tokenizedArgs, 0, sizeof(tokenizedArgs));
@@ -194,13 +230,16 @@ static void CLI_task(UArg arg0, UArg arg1)
             {
                 /* YES: Pass this to the CLI registered function */
                 cliStatus = ptrCLICommandEntry->cmdHandlerFxn (argIndex, tokenizedArgs);
-                if (cliStatus == 0)
+//                if(nbManualCmd <= cntManualCmd)
                 {
-                    CLI_write ("Done\n");
-                }
-                else
-                {
-                    CLI_write ("Error %d\n", cliStatus);
+                    if (cliStatus == 0)
+                    {
+                        CLI_write ("Done\n");
+                    }
+                    else
+                    {
+                        CLI_write ("Error %d\n", cliStatus);
+                    }
                 }
                 break;
             }
@@ -334,7 +373,7 @@ int32_t CLI_open (CLI_Cfg* ptrCLICfg)
     /* Initialize the task parameters and launch the CLI Task: */
     Task_Params_init(&taskParams);
     taskParams.priority  = gCLI.cfg.taskPriority;
-    taskParams.stackSize = 4*1024;
+    taskParams.stackSize = 5*1024;
     gCLI.cliTaskHandle = Task_create(CLI_task, &taskParams, NULL);
     return 0;
 }
@@ -360,4 +399,3 @@ int32_t CLI_close (void)
     memset ((void*)&gCLI, 0, sizeof(CLI_MCB));
     return 0;
 }
-
