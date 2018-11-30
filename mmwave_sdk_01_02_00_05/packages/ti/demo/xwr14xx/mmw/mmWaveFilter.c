@@ -1,4 +1,3 @@
-/* Standard Include Files. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -43,32 +42,6 @@ static int compareIntensity(const void *a, const void *b)
     if(p1->intensity > p2->intensity)
         return -1;
     return 0;
-}
-
-void myswap(mmPoints *v, int i1, int i2)
-{
-    mmPoints sp;
-    
-    copyPoint(&v[i1], &sp);
-    copyPoint(&v[i2], &v[i1]);
-    copyPoint(&sp, &v[i2]);
-}
-
-void myqsort(mmPoints *v, int left, int right)
-{
-    int i, last;
-
-    if(left >= right)
-        return;
-
-    myswap(v, left, (left + right)/2);
-    last = left;
-    for(i = left+1; i <= right; i++)
-        if(v[i].intensity > v[left].intensity)
-            myswap(v, ++last, i);
-    myswap(v, left, last);
-    myqsort(v, left, last-1);
-    myqsort(v, last+1, right);
 }
 
 static double distance(mmPoints *p1, mmPoints *p2)
@@ -139,7 +112,6 @@ static int combineNeighbors(unsigned int nbInput, mmPoints *input, double maxDis
     nbCopy = copyVector(nbInput, input, copy);
 
     qsort(copy, nbCopy, sizeof(mmPoints), compareIntensity);
-//    myqsort(copy, 0, nbInput-1);
 
     /* points are sorted from highest to lowest intensity. */
 
@@ -196,6 +168,12 @@ static int combineNeighbors(unsigned int nbInput, mmPoints *input, double maxDis
     }
 
     *nbOutput = total;
+
+    /* keep point with high intensity */
+    float thresholdMin = 0.8*output[0].intensity + 0.2*output[total-1].intensity;
+    for(i = 0; i < total; i++)
+        if(output[total-1-i].intensity < thresholdMin)
+            (*nbOutput)--; /* 0nly shrink the size, no need to erase data, they will not be transmit */
 
     return *nbOutput;
 }

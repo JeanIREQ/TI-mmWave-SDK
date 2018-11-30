@@ -775,7 +775,8 @@ CAN_Handle                  canHandle;
 ***************CAN Tx Complete and Rx Interrupt Callback ******************
 **************************************************************************/
 
-static void DCANAppCallback(CAN_MsgObjHandle handle, uint32_t msgObjectNum, CAN_Direction direction){
+static void DCANAppCallback(CAN_MsgObjHandle handle, uint32_t msgObjectNum, CAN_Direction direction)
+{
     int32_t errCode, retVal;
     if (direction == CAN_Direction_TX){
         if (msgObjectNum != DCAN_TX_MSG_OBJ){
@@ -868,7 +869,7 @@ static void DCANAppInitParams(CAN_DCANCfgParams*        dcanCfgParams,
     dcanTxCfgParams->msgValid       = 1;
     dcanTxCfgParams->xIdFlag        = CAN_DCANXidType_11_BIT;
     dcanTxCfgParams->direction      = CAN_Direction_TX;
-    dcanTxCfgParams->msgIdentifier  = 20 + RADAR_TAG_ID_FROM_MAKEFILE; /* 0xC1; */
+    dcanTxCfgParams->msgIdentifier  = RADAR_TAG_ID_FROM_MAKEFILE; /* 0xC1; */
 
     dcanTxCfgParams->uMaskUsed  = 1;
     dcanTxCfgParams->intEnable  = 1;
@@ -982,12 +983,42 @@ int TransmitMessageOverCAN(MmwDemo_DataPathObj *dataPathObj)
     mmPoints pointsOutput[100]; 
     unsigned int nbPointsOutput = 0;
     unsigned int i;
+    volatile short x,y,z;
+    volatile unsigned short intensity;
     combineNeighborsDataPathObj(dataPathObj, &nbPointsOutput, pointsOutput);
 
     if(nbPointsOutput == 0) /* nothing to transmit */
         return 0;
 
-    appDcanTxData.dataLength = DCAN_MAX_MSG_LENGTH; /* This is the beginning of a frame */
+    for(i = 0; i < nbPointsOutput; i++)
+    {
+        x = (short)(pointsOutput[i].x * 512);
+        y = (short)(pointsOutput[i].y * 512);
+        z = (short)(pointsOutput[i].z * 512);
+        intensity = (unsigned short)(pointsOutput[i].intensity * 512);
+
+        appDcanTxData.dataLength = DCAN_MAX_MSG_LENGTH;
+        appDcanTxData.msgData[0] = (uint8_t)(x & 0xFFU);
+        appDcanTxData.msgData[1] = (uint8_t)((x & 0xFF00U) >> 8U);
+        appDcanTxData.msgData[2] = (uint8_t)(y & 0xFFU);
+        appDcanTxData.msgData[3] = (uint8_t)((y & 0xFF00U) >> 8U);
+        appDcanTxData.msgData[4] = (uint8_t)(z & 0xFFU);
+        appDcanTxData.msgData[5] = (uint8_t)((z & 0xFF00U) >> 8U);
+        appDcanTxData.msgData[6] = (uint8_t)(intensity & 0xFFU);
+        appDcanTxData.msgData[7] = (uint8_t)((intensity & 0xFF00U) >> 8U);
+
+        retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
+        while(gTxDoneFlag == 0);
+        gTxDoneFlag = 0;
+
+        if (retVal < 0)
+        {
+            System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode);
+            return -1;
+        }
+    }
+
+    appDcanTxData.dataLength = DCAN_MAX_MSG_LENGTH; /* This is the ending of a frame */
     appDcanTxData.msgData[0] = 0x01;
     appDcanTxData.msgData[1] = 0x02;
     appDcanTxData.msgData[2] = 0x03;
@@ -999,34 +1030,14 @@ int TransmitMessageOverCAN(MmwDemo_DataPathObj *dataPathObj)
 
     /* Send data over Tx message object */
     retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
+
+    while(gTxDoneFlag == 0);
+    gTxDoneFlag = 0;
+
     if (retVal < 0)
     {
         System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode);
         return -1;
-    }
-
-    for(i = 0; i < nbPointsOutput; i++)
-    {
-        short x = (short)(pointsOutput[i].x * 512);
-        short y = (short)(pointsOutput[i].y * 512);
-        short z = (short)(pointsOutput[i].z * 512);
-        unsigned short intensity = (unsigned short)(pointsOutput[i].intensity * 512);
-
-        appDcanTxData.msgData[0] = (uint8_t)(x & 0xFFU);
-        appDcanTxData.msgData[1] = (uint8_t)((x & 0xFF00U) >> 8U);
-        appDcanTxData.msgData[2] = (uint8_t)(y & 0xFFU);
-        appDcanTxData.msgData[3] = (uint8_t)((y & 0xFF00U) >> 8U);
-        appDcanTxData.msgData[4] = (uint8_t)(z & 0xFFU);
-        appDcanTxData.msgData[5] = (uint8_t)((z & 0xFF00U) >> 8U);
-        appDcanTxData.msgData[6] = (uint8_t)(intensity & 0xFFU);
-        appDcanTxData.msgData[7] = (uint8_t)((intensity & 0xFF00U) >> 8U);
-
-        retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
-        if (retVal < 0)
-        {
-            System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode);
-            return -1;
-        }
     }
 
     return 0;
