@@ -771,6 +771,8 @@ uint32_t                    msgLstErrCnt = 0U;
 uint32_t                    dataMissMatchErrCnt = 0U;
 CAN_Handle                  canHandle;
 
+volatile uint32_t           CANNeverConnect = 1;
+
 /**************************************************************************
 ***************CAN Tx Complete and Rx Interrupt Callback ******************
 **************************************************************************/
@@ -985,6 +987,7 @@ int TransmitMessageOverCAN(MmwDemo_DataPathObj *dataPathObj)
     unsigned int i;
     volatile short x,y,z;
     volatile unsigned short intensity;
+    volatile int count = 0;
     combineNeighborsDataPathObj(dataPathObj, &nbPointsOutput, pointsOutput);
 
     if(nbPointsOutput == 0) /* nothing to transmit */
@@ -1008,6 +1011,14 @@ int TransmitMessageOverCAN(MmwDemo_DataPathObj *dataPathObj)
         appDcanTxData.msgData[7] = (uint8_t)((intensity & 0xFF00U) >> 8U);
 
         retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
+
+        if(gTxDoneFlag)
+            CANNeverConnect = 0;
+
+        if(CANNeverConnect)
+            return 0;
+
+        count = 0;
         while(gTxDoneFlag == 0);
         gTxDoneFlag = 0;
 
@@ -1030,6 +1041,12 @@ int TransmitMessageOverCAN(MmwDemo_DataPathObj *dataPathObj)
 
     /* Send data over Tx message object */
     retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
+
+    if(gTxDoneFlag)
+        CANNeverConnect = 0;
+
+    if(CANNeverConnect)
+        return 0;
 
     while(gTxDoneFlag == 0);
     gTxDoneFlag = 0;
