@@ -6,7 +6,7 @@
 #include <math.h>
 #include "mmWaveFilter.h"
 
-#define MAXPTS 200
+#define MAXPTS 150
 
 mmPoints pointsTable[25][25];
 unsigned char nbRow;

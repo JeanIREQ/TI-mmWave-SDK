@@ -771,7 +771,14 @@ uint32_t                    msgLstErrCnt = 0U;
 uint32_t                    dataMissMatchErrCnt = 0U;
 CAN_Handle                  canHandle;
 
-volatile uint32_t           CANNeverConnect = 1;
+Semaphore_Handle semPointsHandle;
+Semaphore_Params semPointsParams;
+
+volatile unsigned int newPoints = 0;
+volatile unsigned int nbPointsOutput = 0;
+mmPoints              pointsOutput[50]; 
+volatile unsigned int nbPointsOutputCopy = 0;
+mmPoints              pointsOutputCopy[50]; 
 
 /**************************************************************************
 ***************CAN Tx Complete and Rx Interrupt Callback ******************
@@ -977,87 +984,95 @@ int32_t DCANAppCalcBitTimeParams(uint32_t               clkFreq,
     return 0;
 }
 
-int TransmitMessageOverCAN(MmwDemo_DataPathObj *dataPathObj)
+void TransmitMessageOverCAN(UArg arg0, UArg arg1)
 {
-    int32_t retVal = 0;
-    int32_t errCode = 0;
-
-    mmPoints pointsOutput[100]; 
-    unsigned int nbPointsOutput = 0;
-    unsigned int i;
-    volatile short x,y,z;
-    volatile unsigned short intensity;
-    volatile int count = 0;
-    combineNeighborsDataPathObj(dataPathObj, &nbPointsOutput, pointsOutput);
-
-    if(nbPointsOutput == 0) /* nothing to transmit */
-        return 0;
-
-    for(i = 0; i < nbPointsOutput; i++)
+    while(1)
     {
-        x = (short)(pointsOutput[i].x * 512);
-        y = (short)(pointsOutput[i].y * 512);
-        z = (short)(pointsOutput[i].z * 512);
-        intensity = (unsigned short)(pointsOutput[i].intensity * 512);
+        int32_t retVal = 0;
+        int32_t errCode = 0;
 
-        appDcanTxData.dataLength = DCAN_MAX_MSG_LENGTH;
-        appDcanTxData.msgData[0] = (uint8_t)(x & 0xFFU);
-        appDcanTxData.msgData[1] = (uint8_t)((x & 0xFF00U) >> 8U);
-        appDcanTxData.msgData[2] = (uint8_t)(y & 0xFFU);
-        appDcanTxData.msgData[3] = (uint8_t)((y & 0xFF00U) >> 8U);
-        appDcanTxData.msgData[4] = (uint8_t)(z & 0xFFU);
-        appDcanTxData.msgData[5] = (uint8_t)((z & 0xFF00U) >> 8U);
-        appDcanTxData.msgData[6] = (uint8_t)(intensity & 0xFFU);
-        appDcanTxData.msgData[7] = (uint8_t)((intensity & 0xFF00U) >> 8U);
+        unsigned int i;
+        volatile short x,y,z;
+        volatile unsigned short intensity;
+        volatile unsigned int newPointsCopy = 0;
+        volatile unsigned int counter;
 
+        Semaphore_pend(semPointsHandle, BIOS_WAIT_FOREVER);
+        memcpy(pointsOutputCopy, pointsOutput, 50*sizeof(mmPoints));
+        nbPointsOutputCopy = nbPointsOutput;
+        newPointsCopy = newPoints;
+        newPoints = 0;
+        Semaphore_post(semPointsHandle);
+
+        if(newPointsCopy == 0)
+        {
+            Task_sleep(1);
+            continue;
+        }
+
+        for(i = 0; i < nbPointsOutputCopy; i++)
+        {
+            x = (short)(pointsOutputCopy[i].x * 512);
+            y = (short)(pointsOutputCopy[i].y * 512);
+            z = (short)(pointsOutputCopy[i].z * 512);
+            intensity = (unsigned short)(pointsOutputCopy[i].intensity * 512);
+
+            appDcanTxData.dataLength = DCAN_MAX_MSG_LENGTH;
+            appDcanTxData.msgData[0] = (uint8_t)(x & 0xFFU);
+            appDcanTxData.msgData[1] = (uint8_t)((x & 0xFF00U) >> 8U);
+            appDcanTxData.msgData[2] = (uint8_t)(y & 0xFFU);
+            appDcanTxData.msgData[3] = (uint8_t)((y & 0xFF00U) >> 8U);
+            appDcanTxData.msgData[4] = (uint8_t)(z & 0xFFU);
+            appDcanTxData.msgData[5] = (uint8_t)((z & 0xFF00U) >> 8U);
+            appDcanTxData.msgData[6] = (uint8_t)(intensity & 0xFFU);
+            appDcanTxData.msgData[7] = (uint8_t)((intensity & 0xFF00U) >> 8U);
+
+            retVal = CAN_transmitData(txMsgObjHandle, &appDcanTxData, &errCode);
+
+            counter = 0;
+            while(gTxDoneFlag == 0)
+            {
+                counter++;
+                if(counter > 20000000) /* add timeout if CAN not connected. */
+                    break;
+            }
+            gTxDoneFlag = 0;
+
+            if (retVal < 0)
+            {
+                /* System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode); */
+                continue;
+            }
+        }
+
+        appDcanTxData.dataLength = DCAN_MAX_MSG_LENGTH; /* This is the ending of a frame */
+        appDcanTxData.msgData[0] = 0x01;
+        appDcanTxData.msgData[1] = 0x02;
+        appDcanTxData.msgData[2] = 0x03;
+        appDcanTxData.msgData[3] = 0x04;
+        appDcanTxData.msgData[4] = 0x05;
+        appDcanTxData.msgData[5] = 0x06;
+        appDcanTxData.msgData[6] = 0x07;
+        appDcanTxData.msgData[7] = 0x08;
+
+        /* Send data over Tx message object */
         retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
 
-        if(gTxDoneFlag)
-            CANNeverConnect = 0;
-
-        if(CANNeverConnect)
-            return 0;
-
-        count = 0;
-        while(gTxDoneFlag == 0);
+        counter = 0;
+        while(gTxDoneFlag == 0)
+        {
+            counter++;
+            if(counter > 20000000)
+                break;
+        }
         gTxDoneFlag = 0;
 
         if (retVal < 0)
         {
-            System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode);
-            return -1;
+            /* System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode); */
+            continue;
         }
     }
-
-    appDcanTxData.dataLength = DCAN_MAX_MSG_LENGTH; /* This is the ending of a frame */
-    appDcanTxData.msgData[0] = 0x01;
-    appDcanTxData.msgData[1] = 0x02;
-    appDcanTxData.msgData[2] = 0x03;
-    appDcanTxData.msgData[3] = 0x04;
-    appDcanTxData.msgData[4] = 0x05;
-    appDcanTxData.msgData[5] = 0x06;
-    appDcanTxData.msgData[6] = 0x07;
-    appDcanTxData.msgData[7] = 0x08;
-
-    /* Send data over Tx message object */
-    retVal = CAN_transmitData (txMsgObjHandle, &appDcanTxData, &errCode);
-
-    if(gTxDoneFlag)
-        CANNeverConnect = 0;
-
-    if(CANNeverConnect)
-        return 0;
-
-    while(gTxDoneFlag == 0);
-    gTxDoneFlag = 0;
-
-    if (retVal < 0)
-    {
-        System_printf ("Error: CAN transmit data for iteration %d failed [Error code %d]\n", iterationCount, errCode);
-        return -1;
-    }
-
-    return 0;
 }
 
 /**************************************************************************
@@ -2546,7 +2561,14 @@ void MmwDemo_dataPathTask(UArg arg0, UArg arg1)
             MmwDemo_transferLVDSUserData(dataPathObj);
         }
 
-        TransmitMessageOverCAN(dataPathObj);
+        Semaphore_pend(semPointsHandle, BIOS_WAIT_FOREVER);
+        {
+        unsigned int localNB;
+        combineNeighborsDataPathObj(dataPathObj, &localNB, pointsOutput);
+        nbPointsOutput = localNB;
+        }
+        newPoints = 1;
+        Semaphore_post(semPointsHandle);
 
         MmwDemo_transmitProcessedOutput(gMmwMCB.loggingUartHandle,
                                         dataPathObj);
@@ -2736,6 +2758,10 @@ void MmwDemo_initTask(UArg arg0, UArg arg1)
     Pmu_configureCounter(0, 0x11, FALSE);
     Pmu_startCounter(0);
 
+    Semaphore_Params_init(&semPointsParams);
+    semPointsParams.mode  = Semaphore_Mode_BINARY;
+    semPointsHandle = Semaphore_create(1, &semPointsParams, NULL);
+
     /*****************************************************************************
      * Launch the mmWave control execution task
      * - This should have a higher priroity than any other task which uses the
@@ -2789,6 +2815,10 @@ void MmwDemo_initTask(UArg arg0, UArg arg1)
     taskParams.stackSize = 6*1024;
     Task_create(MmwDemo_dataPathTask, &taskParams, NULL);
 
+    Task_Params_init(&taskParams);
+    taskParams.priority  = 3;
+    taskParams.stackSize = 1024;
+    Task_create(TransmitMessageOverCAN, &taskParams, NULL);
     return;
 }
 
